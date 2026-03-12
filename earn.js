@@ -1,8 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
-const { spawn } = require("child_process");
 const net = require("net");
+const { spawn } = require("child_process");
+const { chromium } = require("playwright");
 
 /* ================= CONFIG ================= */
 
@@ -11,9 +11,12 @@ const TARGET_URL =
   "https://bot-hosting.net/panel/earn";
 
 const HY2_URL = process.env.HY2_URL || "";
+
 const SOCKS_PORT = 51080;
 
-const EXT_DIR = path.resolve(__dirname, "extensions/helper");
+const COOKIE_FILE = path.resolve(__dirname, "cookies/discord.json");
+
+const EXT_NOPECHA = path.resolve(__dirname, "extensions/nopecha/unpacked");
 
 const SCREEN_DIR = path.resolve(__dirname, "screenshots");
 
@@ -29,13 +32,28 @@ function ensureScreenDir() {
   }
 }
 
-async function screenshot(page, name) {
+async function snap(page, name) {
   try {
     ensureScreenDir();
     const file = path.join(SCREEN_DIR, `${Date.now()}_${name}.png`);
     await page.screenshot({ path: file, fullPage: true });
     console.log("📸 Screenshot:", file);
   } catch {}
+}
+
+/* ================= COOKIE ================= */
+
+async function injectCookies(context) {
+  if (!fs.existsSync(COOKIE_FILE)) {
+    console.log("⚠️ Cookie file missing");
+    return;
+  }
+
+  const cookies = JSON.parse(fs.readFileSync(COOKIE_FILE, "utf8"));
+
+  await context.addCookies(cookies);
+
+  console.log("🍪 Injected cookies:", cookies.length);
 }
 
 /* ================= HY2 ================= */
@@ -47,7 +65,7 @@ function parseHy2(url) {
   return {
     server: `${parsed.hostname}:${parsed.port}`,
     auth: decodeURIComponent(parsed.username),
-    sni: parsed.searchParams.get("sni") || parsed.hostname,
+    sni: parsed.searchParams.get("sni") || parsed.hostname
   };
 }
 
@@ -65,7 +83,7 @@ async function waitPort(port) {
         res(true);
       });
 
-      s.on("error", () => res(false));
+      s.on("error", () => res(false);
     });
 
     if (ok) return true;
@@ -75,8 +93,9 @@ async function waitPort(port) {
 }
 
 async function startHy2() {
+
   if (!HY2_URL) {
-    console.log("⚠️ HY2 未设置，跳过代理");
+    console.log("⚠️ HY2_URL 未设置");
     return null;
   }
 
@@ -103,7 +122,7 @@ async function startHy2() {
     )
   );
 
-  console.log("🚀 启动 hysteria2");
+  console.log("🚀 Start hysteria2");
 
   const proc = spawn("hysteria", ["client", "-c", cfgPath], {
     stdio: "ignore",
@@ -111,7 +130,7 @@ async function startHy2() {
   });
 
   if (!(await waitPort(SOCKS_PORT))) {
-    throw new Error("❌ HY2 socks 未启动");
+    throw new Error("❌ HY2 socks 未就绪");
   }
 
   console.log("✅ HY2 socks ready");
@@ -131,11 +150,12 @@ async function autoClick(page) {
 
   for (const s of selectors) {
     try {
+
       const el = page.locator(s).first();
 
       if (await el.isVisible()) {
         await el.click({ force: true });
-        console.log("🖱 点击:", s);
+        console.log("🖱 Click:", s);
       }
 
     } catch {}
@@ -153,29 +173,34 @@ async function main() {
     hy2 = await startHy2();
 
     const context = await chromium.launchPersistentContext("./profile", {
+
       headless: false,
 
       args: [
-        HY2_URL ? `--proxy-server=socks5://127.0.0.1:${SOCKS_PORT}` : "",
-        `--disable-extensions-except=${EXT_DIR}`,
-        `--load-extension=${EXT_DIR}`,
+        HY2_URL
+          ? `--proxy-server=socks5://127.0.0.1:${SOCKS_PORT}`
+          : "",
+
+        `--disable-extensions-except=${EXT_NOPECHA}`,
+        `--load-extension=${EXT_NOPECHA}`,
+
         "--no-sandbox",
         "--disable-dev-shm-usage"
       ].filter(Boolean)
     });
 
+    await injectCookies(context);
+
     const page = await context.newPage();
 
-    console.log("🌍 打开页面");
+    console.log("🌍 Open:", TARGET_URL);
 
     await page.goto(TARGET_URL, {
       waitUntil: "networkidle",
       timeout: 120000
     });
 
-    await screenshot(page, "page_loaded");
-
-    console.log("🟢 自动点击循环开始");
+    await snap(page, "page_loaded");
 
     while (true) {
 
