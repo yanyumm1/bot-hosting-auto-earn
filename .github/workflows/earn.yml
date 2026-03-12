@@ -3,7 +3,7 @@ name: BotHosting Auto Earn
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "21 7,23 * * *"
 
 jobs:
   earn:
@@ -18,21 +18,33 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install system deps
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb wget unzip curl jq p7zip-full
 
-      - name: Install hysteria2
+      - name: Install Hysteria2
         run: |
-          curl -L -o hysteria https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64
+          curl -L -o hysteria \
+            https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64
           chmod +x hysteria
           sudo mv hysteria /usr/local/bin/
 
       - name: Install node deps
         run: |
           npm install
-          npx playwright install chromium
+          npx playwright install --with-deps chromium
+
+      - name: Download NopeCHA
+        run: |
+          mkdir -p extensions/nopecha
+          wget -O extensions/nopecha/chromium.zip \
+          https://github.com/NopeCHALLC/nopecha-extension/releases/latest/download/chromium.zip
+
+      - name: Unpack extension
+        run: |
+          mkdir -p extensions/nopecha/unpacked
+          7z x -y extensions/nopecha/chromium.zip -oextensions/nopecha/unpacked
 
       - name: Run script
         env:
@@ -46,4 +58,4 @@ jobs:
         if: always()
         with:
           name: screenshots
-          path: screenshots/*
+          path: screenshots/**
