@@ -1,0 +1,49 @@
+name: BotHosting Auto Earn
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  earn:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb wget unzip curl jq p7zip-full
+
+      - name: Install hysteria2
+        run: |
+          curl -L -o hysteria https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64
+          chmod +x hysteria
+          sudo mv hysteria /usr/local/bin/
+
+      - name: Install node deps
+        run: |
+          npm install
+          npx playwright install chromium
+
+      - name: Run script
+        env:
+          HY2_URL: ${{ secrets.HY2_URL }}
+          TARGET_URL: https://bot-hosting.net/panel/earn
+        run: |
+          mkdir -p screenshots
+          xvfb-run -a node earn.js
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots/*
